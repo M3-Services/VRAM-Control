@@ -10,4 +10,5 @@ pub mod plan;
 pub mod procs;
 pub mod protect;
 pub mod render;
+pub mod rules;
 pub mod units;
