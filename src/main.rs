@@ -1,15 +1,21 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use std::path::PathBuf;
+use vramctl::clean::{CleanOptions, run_check_config, run_clean};
 use vramctl::collect::collect_inventory;
+use vramctl::config::default_config_path;
 use vramctl::gpu::enumerate_gpus;
 use vramctl::render::{render_gpus, render_table};
 
 const MIB: u64 = 1024 * 1024;
 
-/// Inventory GPU memory consumers.
+/// Inventory GPU memory consumers and free VRAM by terminating selected processes.
 #[derive(Parser)]
 #[command(version, arg_required_else_help = true)]
 struct Cli {
+    /// Configuration file (default: %APPDATA%\vramctl\vramctl.toml).
+    #[arg(long, global = true, value_name = "PATH")]
+    config: Option<PathBuf>,
     #[command(subcommand)]
     command: Command,
 }
@@ -31,10 +37,32 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Terminate the processes selected by the configured rules, after showing a plan.
+    Clean {
+        /// Only use the rules listed in this profile (default: all rules).
+        #[arg(long)]
+        profile: Option<String>,
+        /// Show the plan and stop: nothing is touched.
+        #[arg(long)]
+        dry_run: bool,
+        /// Do not ask for confirmation (for scheduled tasks and scripts).
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Validate the configuration file without doing anything else.
+    CheckConfig,
+}
+
+fn config_path(explicit: Option<PathBuf>) -> Result<PathBuf> {
+    match explicit {
+        Some(path) => Ok(path),
+        None => default_config_path(),
+    }
 }
 
 fn main() -> Result<()> {
-    match Cli::parse().command {
+    let cli = Cli::parse();
+    match cli.command {
         Command::List { json, min_mb } => {
             let inventory = collect_inventory()?;
             if json {
@@ -51,6 +79,23 @@ fn main() -> Result<()> {
                 print!("{}", render_gpus(&gpus));
             }
         }
+        Command::Clean {
+            profile,
+            dry_run,
+            yes,
+        } => {
+            let path = config_path(cli.config)?;
+            let all_ok = run_clean(&CleanOptions {
+                config_path: &path,
+                profile: profile.as_deref(),
+                dry_run,
+                assume_yes: yes,
+            })?;
+            if !all_ok {
+                std::process::exit(1);
+            }
+        }
+        Command::CheckConfig => run_check_config(&config_path(cli.config)?)?,
     }
     Ok(())
 }
