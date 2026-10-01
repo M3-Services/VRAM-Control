@@ -6,18 +6,20 @@ use vramctl::collect::collect_inventory;
 use vramctl::config::default_config_path;
 use vramctl::gpu::enumerate_gpus;
 use vramctl::render::{render_gpus, render_table};
+use vramctl::tui;
 
 const MIB: u64 = 1024 * 1024;
 
 /// Inventory GPU memory consumers and free VRAM by terminating selected processes.
 #[derive(Parser)]
-#[command(version, arg_required_else_help = true)]
+#[command(version)]
 struct Cli {
     /// Configuration file (default: %APPDATA%\vramctl\vramctl.toml).
     #[arg(long, global = true, value_name = "PATH")]
     config: Option<PathBuf>,
+    /// Without a command, the interactive terminal UI opens.
     #[command(subcommand)]
-    command: Command,
+    command: Option<Command>,
 }
 
 #[derive(Subcommand)]
@@ -62,7 +64,10 @@ fn config_path(explicit: Option<PathBuf>) -> Result<PathBuf> {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    match cli.command {
+    let Some(command) = cli.command else {
+        return tui::run(&config_path(cli.config)?);
+    };
+    match command {
         Command::List { json, min_mb } => {
             let inventory = collect_inventory()?;
             if json {
