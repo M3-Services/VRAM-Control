@@ -3,9 +3,9 @@
 A command-line tool with a terminal UI (TUI) to **find out what is using your GPU memory** and
 **free it** by terminating the processes you choose.
 
-> **Status: early development.** `vramctl list`, `vramctl gpus`, `vramctl check-config` and
-> `vramctl clean` work on Windows. The TUI, WSL support and administrator elevation are not
-> implemented yet; the rest of this README describes the planned behavior. See
+> **Status: early development.** On Windows, `vramctl` (interactive TUI), `vramctl list`,
+> `vramctl gpus`, `vramctl check-config` and `vramctl clean` work. WSL support and administrator
+> elevation are not implemented yet; the rest of this README describes the planned behavior. See
 > [ROADMAP.md](ROADMAP.md) for ideas beyond the first version.
 
 ## Why
@@ -42,7 +42,7 @@ exposes and puts them in one place, together with the means to clean up.
 ## Planned usage
 
 ```text
-vramctl                          # open the TUI
+vramctl                          # open the TUI (? shows the keys)
 vramctl list [--json]            # print the inventory
 vramctl gpus                     # list detected GPUs
 vramctl clean [--profile <name>] [--dry-run] [--yes] [--no-elevate]
@@ -51,6 +51,25 @@ vramctl check-config             # validate the configuration file
 
 A scheduled cleanup does not need a dedicated feature: run
 `vramctl clean --profile <name> --yes` from a Windows scheduled task.
+
+## TUI keys
+
+| Key | Action |
+|---|---|
+| Up / Down / PageUp / PageDown / Home / End | Move |
+| Space | Select or unselect the process |
+| `a` | Select or unselect everything visible |
+| `k` | Terminate the selection (or the process under the cursor); asks for confirmation |
+| `p` | Apply a profile from the configuration; asks for confirmation |
+| `/` | Filter by name, command line or PID (Enter keeps it, Esc clears it) |
+| `g` | Switch between processes and applications (read-only view) |
+| Tab / Shift+Tab | Next / previous GPU (when several GPUs are present) |
+| `r` | Refresh now |
+| `?` | Help |
+| `q` / Esc | Quit |
+
+Protected processes are flagged and can never be terminated. Nothing is terminated without
+pressing `y` in the confirmation popup.
 
 ## Configuration
 
