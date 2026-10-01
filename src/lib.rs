@@ -7,5 +7,6 @@ pub mod model;
 pub mod pdh;
 pub mod pdh_names;
 pub mod procs;
+pub mod protect;
 pub mod render;
 pub mod units;
