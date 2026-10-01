@@ -25,7 +25,13 @@ const FORCE_WAIT_MS: u32 = 5000;
 pub struct WindowsControl;
 
 /// Owns a process handle and closes it when dropped.
-struct Handle(HANDLE);
+pub(crate) struct Handle(HANDLE);
+
+impl Handle {
+    pub(crate) fn new(handle: HANDLE) -> Self {
+        Self(handle)
+    }
+}
 
 impl Drop for Handle {
     fn drop(&mut self) {
@@ -49,7 +55,7 @@ fn open(
     }
 }
 
-fn wait_for_exit(handle: &Handle, timeout_ms: u32) -> bool {
+pub(crate) fn wait_for_exit(handle: &Handle, timeout_ms: u32) -> bool {
     // SAFETY: the handle is valid for the lifetime of `handle`.
     unsafe { WaitForSingleObject(handle.0, timeout_ms) == WAIT_OBJECT_0 }
 }

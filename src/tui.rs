@@ -4,7 +4,7 @@
 use crate::app::{App, Effect};
 use crate::collect::collect_inventory;
 use crate::config::Config;
-use crate::executor::execute_plan;
+use crate::elevate::{Elevator, WindowsElevator, execute_with_elevation, is_elevated};
 use crate::inventory::Inventory;
 use crate::plan::Plan;
 use crate::procs::read_process_details;
@@ -75,7 +75,15 @@ fn load_config(path: &Path) -> (Option<Config>, Option<String>) {
     }
 }
 
-pub fn run(config_path: &Path) -> Result<()> {
+/// What is needed to run a confirmed plan.
+struct Execution {
+    grace_ms: u64,
+    /// Extra protected names, passed to the elevated helper.
+    protect: Vec<String>,
+    allow_elevation: bool,
+}
+
+pub fn run(config_path: &Path, allow_elevation: bool) -> Result<()> {
     let (config, note) = load_config(config_path);
     let extra = config
         .as_ref()
@@ -93,7 +101,12 @@ pub fn run(config_path: &Path) -> Result<()> {
     let collector = spawn_collector(Duration::from_millis(settings.refresh_ms));
 
     let mut terminal = ratatui::try_init()?;
-    let result = event_loop(&mut terminal, &mut app, &collector, settings.grace_ms);
+    let execution = Execution {
+        grace_ms: settings.grace_ms,
+        protect: extra,
+        allow_elevation,
+    };
+    let result = event_loop(&mut terminal, &mut app, &collector, &execution);
     ratatui::restore();
     result
 }
@@ -102,7 +115,7 @@ fn event_loop(
     terminal: &mut DefaultTerminal,
     app: &mut App,
     collector: &Collector,
-    grace_ms: u64,
+    execution: &Execution,
 ) -> Result<()> {
     loop {
         terminal.draw(|frame| draw(frame, app))?;
@@ -120,7 +133,7 @@ fn event_loop(
                 Effect::Execute(plan) => {
                     app.status = Some("Terminating...".to_string());
                     terminal.draw(|frame| draw(frame, app))?;
-                    execute(app, &plan, grace_ms);
+                    execute(app, &plan, execution);
                 }
                 Effect::ShowDetails { pid, start_time } => {
                     app.show_details(pid, read_process_details(pid, start_time));
@@ -139,9 +152,19 @@ fn event_loop(
 }
 
 /// Runs a confirmed plan, then measures what was actually freed and shows the report.
-fn execute(app: &mut App, plan: &Plan, grace_ms: u64) {
+fn execute(app: &mut App, plan: &Plan, execution: &Execution) {
     let before = used_bytes(&app.inventory);
-    let results = execute_plan(plan, &WindowsControl, grace_ms);
+    // Denied processes are retried in ONE elevated batch: the user only has to accept the UAC
+    // prompt that Windows shows over the terminal.
+    let elevator: Option<&dyn Elevator> =
+        (execution.allow_elevation && !is_elevated()).then_some(&WindowsElevator);
+    let results = execute_with_elevation(
+        plan,
+        &WindowsControl,
+        elevator,
+        &execution.protect,
+        execution.grace_ms,
+    );
     // Give the driver a moment to release the memory.
     std::thread::sleep(Duration::from_millis(500));
     let freed = match collect_inventory() {

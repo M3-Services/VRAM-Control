@@ -15,6 +15,8 @@ pub enum Outcome {
     IdentityMismatch,
     /// The caller lacks the rights to terminate the process.
     AccessDenied,
+    /// The user declined the UAC prompt, so the process was left alone.
+    ElevationDeclined,
     Failed(String),
 }
 
@@ -43,9 +45,12 @@ pub fn execute_plan(plan: &Plan, control: &dyn ProcessControl, grace_ms: u64) ->
 
 /// True when at least one action was denied or failed (useful as a process exit status).
 pub fn has_failures(results: &[ActionResult]) -> bool {
-    results
-        .iter()
-        .any(|r| matches!(r.outcome, Outcome::AccessDenied | Outcome::Failed(_)))
+    results.iter().any(|r| {
+        matches!(
+            r.outcome,
+            Outcome::AccessDenied | Outcome::ElevationDeclined | Outcome::Failed(_)
+        )
+    })
 }
 
 fn describe(outcome: &Outcome) -> String {
@@ -55,8 +60,9 @@ fn describe(outcome: &Outcome) -> String {
         Outcome::IdentityMismatch => {
             "skipped: the PID now belongs to a different process".to_string()
         }
-        Outcome::AccessDenied => {
-            "denied: administrator rights are required (not supported yet)".to_string()
+        Outcome::AccessDenied => "denied: administrator rights are required".to_string(),
+        Outcome::ElevationDeclined => {
+            "denied: administrator rights are required and the UAC prompt was declined".to_string()
         }
         Outcome::Failed(reason) => format!("failed: {reason}"),
     }
@@ -169,6 +175,14 @@ mod tests {
         assert_eq!(results[0].outcome, Outcome::AccessDenied);
         assert_eq!(results[1].outcome, Outcome::Terminated);
         assert!(has_failures(&results));
+    }
+
+    #[test]
+    fn a_declined_elevation_is_a_failure_and_is_explained() {
+        let control = fake(&[(1, Outcome::ElevationDeclined)]);
+        let results = execute_plan(&plan(&[1]), &control, 1000);
+        assert!(has_failures(&results));
+        assert!(render_report(&results, 0, None).contains("UAC prompt was declined"));
     }
 
     #[test]

@@ -4,6 +4,7 @@ pub mod clean;
 pub mod collect;
 pub mod config;
 pub mod details;
+pub mod elevate;
 pub mod executor;
 pub mod gpu;
 pub mod inventory;

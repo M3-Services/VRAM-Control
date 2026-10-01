@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use vramctl::clean::{CleanOptions, run_check_config, run_clean};
 use vramctl::collect::collect_inventory;
 use vramctl::config::default_config_path;
+use vramctl::elevate::{ElevatedJob, run_elevated_job};
 use vramctl::gpu::enumerate_gpus;
 use vramctl::render::{render_gpus, render_table};
 use vramctl::tui;
@@ -17,6 +18,9 @@ struct Cli {
     /// Configuration file (default: %APPDATA%\vramctl\vramctl.toml).
     #[arg(long, global = true, value_name = "PATH")]
     config: Option<PathBuf>,
+    /// Never relaunch as administrator (no UAC prompt): processes that need it stay denied.
+    #[arg(long, global = true)]
+    no_elevate: bool,
     /// Without a command, the interactive terminal UI opens.
     #[command(subcommand)]
     command: Option<Command>,
@@ -53,6 +57,21 @@ enum Command {
     },
     /// Validate the configuration file without doing anything else.
     CheckConfig,
+    /// Internal: elevated helper started through the UAC prompt. Not meant to be run by hand.
+    #[command(hide = true)]
+    ElevatedStop {
+        /// File where the outcome of each target is written.
+        #[arg(long)]
+        out: PathBuf,
+        #[arg(long)]
+        grace_ms: u64,
+        /// Extra protected process name (repeatable).
+        #[arg(long)]
+        protect: Vec<String>,
+        /// Process to stop, as pid:start_time:action:tree (repeatable).
+        #[arg(long)]
+        target: Vec<String>,
+    },
 }
 
 fn config_path(explicit: Option<PathBuf>) -> Result<PathBuf> {
@@ -65,7 +84,7 @@ fn config_path(explicit: Option<PathBuf>) -> Result<PathBuf> {
 fn main() -> Result<()> {
     let cli = Cli::parse();
     let Some(command) = cli.command else {
-        return tui::run(&config_path(cli.config)?);
+        return tui::run(&config_path(cli.config)?, !cli.no_elevate);
     };
     match command {
         Command::List { json, min_mb } => {
@@ -95,12 +114,19 @@ fn main() -> Result<()> {
                 profile: profile.as_deref(),
                 dry_run,
                 assume_yes: yes,
+                allow_elevation: !cli.no_elevate,
             })?;
             if !all_ok {
                 std::process::exit(1);
             }
         }
         Command::CheckConfig => run_check_config(&config_path(cli.config)?)?,
+        Command::ElevatedStop {
+            out,
+            grace_ms,
+            protect,
+            target,
+        } => run_elevated_job(&ElevatedJob::from_parts(grace_ms, protect, &target)?, &out)?,
     }
     Ok(())
 }

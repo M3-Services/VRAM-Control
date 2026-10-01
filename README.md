@@ -4,8 +4,9 @@ A command-line tool with a terminal UI (TUI) to **find out what is using your GP
 **free it** by terminating the processes you choose.
 
 > **Status: early development.** On Windows, `vramctl` (interactive TUI), `vramctl list`,
-> `vramctl gpus`, `vramctl check-config` and `vramctl clean` work. WSL support and administrator
-> elevation are not implemented yet; the rest of this README describes the planned behavior. See
+> `vramctl gpus`, `vramctl check-config` and `vramctl clean` work, including on-demand
+> administrator elevation. WSL support is not implemented yet; the rest of this README describes
+> the planned behavior. See
 > [ROADMAP.md](ROADMAP.md) for ideas beyond the first version.
 
 ## Why
@@ -71,6 +72,19 @@ A scheduled cleanup does not need a dedicated feature: run
 
 Protected processes are flagged and can never be terminated. Nothing is terminated without
 pressing `y` in the confirmation popup.
+
+## Administrator rights
+
+vramctl never runs elevated by default. When a process cannot be terminated without administrator
+rights (services, processes of other sessions), vramctl relaunches itself once as a short-lived
+helper through the standard Windows UAC prompt: you only have to accept it, and one prompt covers
+the whole batch. The helper only terminates the listed processes and re-checks each of them
+(protection list, PID and start time) before acting. Some protected system processes cannot be
+terminated even with administrator rights.
+
+Use `--no-elevate` to disable this (no UAC prompt; such processes simply stay denied). If vramctl
+already runs in an elevated terminal, no prompt is needed. Release binaries are not code-signed
+yet, so the prompt shows an unknown publisher.
 
 ## Configuration
 

@@ -3,7 +3,8 @@
 
 use crate::collect::collect_inventory;
 use crate::config::Config;
-use crate::executor::{execute_plan, has_failures, render_report};
+use crate::elevate::{Elevator, WindowsElevator, execute_with_elevation, is_elevated};
+use crate::executor::{has_failures, render_report};
 use crate::plan::render_plan;
 use crate::protect::Protection;
 use crate::rules::build_plan;
@@ -20,6 +21,8 @@ pub struct CleanOptions<'a> {
     pub dry_run: bool,
     /// Skip the confirmation prompt (for scheduled tasks and scripts).
     pub assume_yes: bool,
+    /// Allow relaunching as administrator (one UAC prompt) for processes that deny termination.
+    pub allow_elevation: bool,
 }
 
 /// Asks a yes/no question. Only "y" or "yes" (any case) means yes; anything else, including an
@@ -85,7 +88,17 @@ pub fn run_clean(options: &CleanOptions) -> Result<bool> {
         }
     }
 
-    let results = execute_plan(&plan, &WindowsControl, config.settings.grace_ms);
+    // Processes that deny termination are retried in ONE elevated batch (a single UAC prompt),
+    // unless elevation is disabled or this process already runs as administrator.
+    let elevator: Option<&dyn Elevator> =
+        (options.allow_elevation && !is_elevated()).then_some(&WindowsElevator);
+    let results = execute_with_elevation(
+        &plan,
+        &WindowsControl,
+        elevator,
+        &config.protect.windows,
+        config.settings.grace_ms,
+    );
 
     // Give the driver a moment to release the memory, then measure what was actually freed.
     std::thread::sleep(Duration::from_millis(500));
