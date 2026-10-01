@@ -14,5 +14,6 @@ pub mod procs;
 pub mod protect;
 pub mod render;
 pub mod rules;
+pub mod ui;
 pub mod units;
 pub mod winproc;
