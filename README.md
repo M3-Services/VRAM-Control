@@ -3,10 +3,10 @@
 A command-line tool with a terminal UI (TUI) to **find out what is using your GPU memory** and
 **free it** by terminating the processes you choose.
 
-> **Status: early development.** `vramctl list` and `vramctl gpus` work (read-only inventory).
-> Cleanup, the TUI, WSL support and administrator elevation are not implemented yet; the rest of
-> this README describes the planned behavior. See [ROADMAP.md](ROADMAP.md) for ideas beyond the
-> first version.
+> **Status: early development.** `vramctl list`, `vramctl gpus`, `vramctl check-config` and
+> `vramctl clean` work on Windows. The TUI, WSL support and administrator elevation are not
+> implemented yet; the rest of this README describes the planned behavior. See
+> [ROADMAP.md](ROADMAP.md) for ideas beyond the first version.
 
 ## Why
 
@@ -55,7 +55,9 @@ A scheduled cleanup does not need a dedicated feature: run
 ## Configuration
 
 A single TOML file owned by VRAM-Control (default location:
-`%APPDATA%\vramctl\vramctl.toml`, overridable with `--config`). Example:
+`%APPDATA%\vramctl\vramctl.toml`, overridable with `--config`). A fully commented example ships
+as [vramctl.example.toml](vramctl.example.toml); WSL rules are accepted but ignored for now.
+Short example:
 
 ```toml
 [protect]
