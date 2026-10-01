@@ -1,0 +1,20 @@
+[package]
+name = "vramctl"
+version = "0.1.0"
+edition = "2024"
+description = "Inventory GPU memory consumers per process and free VRAM by terminating selected processes"
+license = "MIT"
+repository = "https://github.com/M3-Services/VRAM-Control"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sysinfo = "0.39"
+windows = { version = "0.62", features = [
+  "Win32_Foundation",
+  "Win32_System_Performance",
+  "Win32_Graphics_Dxgi",
+  "Win32_Graphics_Dxgi_Common",
+] }
