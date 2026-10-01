@@ -1,4 +1,5 @@
 //! VRAM-Control: inventory of GPU memory consumers.
+pub mod app;
 pub mod clean;
 pub mod collect;
 pub mod config;
