@@ -57,6 +57,7 @@ A scheduled cleanup does not need a dedicated feature: run
 | Key | Action |
 |---|---|
 | Up / Down / PageUp / PageDown / Home / End | Move |
+| Enter | Show the process details: full path, command line, working directory, parent, user, RAM, VRAM per GPU |
 | Space | Select or unselect the process |
 | `a` | Select or unselect everything visible |
 | `k` | Terminate the selection (or the process under the cursor); asks for confirmation |

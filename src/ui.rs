@@ -13,6 +13,7 @@ use ratatui::widgets::{
 
 const HELP: &str = "\
 Up/Down, PageUp/PageDown, Home/End   move
+Enter                                details of the process (full path, command line, parent, user...)
 Space                                select / unselect the process
 a                                    select / unselect everything visible
 k                                    terminate the selection (or the process under the cursor)
@@ -47,8 +48,20 @@ fn centered(area: Rect, percent_x: u16, height: u16) -> Rect {
     }
 }
 
+/// Number of screen lines `text` needs once wrapped to `width` columns.
+fn wrapped_height(text: &str, width: u16) -> u16 {
+    let width = usize::from(width.max(1));
+    let lines: usize = text
+        .lines()
+        .map(|line| line.chars().count().max(1).div_ceil(width))
+        .sum();
+    u16::try_from(lines).unwrap_or(u16::MAX)
+}
+
 fn popup(frame: &mut Frame, title: &str, text: &str) {
-    let lines = text.lines().count() as u16 + 2;
+    // 80% of the width, minus the two border columns, is what the text can use.
+    let inner_width = (frame.area().width * 80 / 100).saturating_sub(2);
+    let lines = wrapped_height(text, inner_width).saturating_add(2);
     let area = centered(frame.area(), 80, lines);
     frame.render_widget(Clear, area);
     let block = Block::default()
@@ -87,6 +100,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
         Mode::Confirm(plan) => popup(frame, "Confirm", &App::confirm_text(plan)),
         Mode::Help => popup(frame, "Help", HELP),
         Mode::Results(report) => popup(frame, "Result (press any key)", report),
+        Mode::Details(text) => popup(frame, "Process details (press any key)", text),
         Mode::Profiles { cursor } => draw_profiles(frame, app, *cursor),
         Mode::Normal | Mode::Filter => {}
     }
@@ -467,6 +481,38 @@ mod tests {
 
     fn app_fresh() -> App {
         app(1)
+    }
+
+    #[test]
+    fn the_details_popup_is_drawn_and_wraps_long_lines() {
+        let mut app = app(1);
+        let long_path = format!(r"C:\{}\tool.exe", "very-long-folder-name\\".repeat(6));
+        let details = crate::model::ProcessDetails {
+            exe: Some(long_path),
+            cmdline: "llama-server --model m.gguf".to_string(),
+            cwd: None,
+            parent: Some((1, "parent.exe".to_string())),
+            user: Some("someone".to_string()),
+            ram_bytes: GIB,
+        };
+        app.show_details(10, Some(details));
+        let text = render(&app, 100, 30);
+        assert!(text.contains("Process details"));
+        assert!(text.contains("llama-server.exe"));
+        assert!(
+            text.contains("tool.exe"),
+            "the end of the long path must be visible: {text}"
+        );
+        assert!(text.contains("parent.exe (PID 1)"));
+        assert!(text.contains("VRAM on GPU 0 Test GPU 0"));
+    }
+
+    #[test]
+    fn wrapped_height_counts_wrapped_lines() {
+        assert_eq!(wrapped_height("", 10), 0);
+        assert_eq!(wrapped_height("abc", 10), 1);
+        assert_eq!(wrapped_height("abcdefghijk", 10), 2);
+        assert_eq!(wrapped_height("a\n\nb", 10), 3);
     }
 
     #[test]

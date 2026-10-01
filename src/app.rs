@@ -2,8 +2,10 @@
 //! behavior can be unit-tested. Rendering is in `ui.rs` and the terminal loop in `tui.rs`.
 
 use crate::config::Config;
+use crate::details::render_details;
 use crate::executor::{ActionResult, render_report};
 use crate::inventory::{AppGroup, Inventory, ProcessEntry, group_by_app};
+use crate::model::ProcessDetails;
 use crate::plan::{Plan, PlannedAction, ProcessAction, ProtectedHit, render_plan};
 use crate::protect::Protection;
 use crate::rules::build_plan;
@@ -32,9 +34,13 @@ pub enum Mode {
     Normal,
     Filter,
     Confirm(Plan),
-    Profiles { cursor: usize },
+    Profiles {
+        cursor: usize,
+    },
     Help,
     Results(String),
+    /// Text of the process details popup.
+    Details(String),
 }
 
 /// What the terminal loop must do after a key press.
@@ -44,6 +50,11 @@ pub enum Effect {
     Quit,
     RefreshNow,
     Execute(Plan),
+    /// Read the details of this process (the loop calls `App::show_details`).
+    ShowDetails {
+        pid: u32,
+        start_time: u64,
+    },
 }
 
 /// One displayed process line.
@@ -280,7 +291,7 @@ impl App {
             Mode::Filter => self.key_filter(event),
             Mode::Confirm(plan) => self.key_confirm(event, plan),
             Mode::Profiles { cursor } => self.key_profiles(event, cursor),
-            Mode::Help | Mode::Results(_) => {
+            Mode::Help | Mode::Results(_) | Mode::Details(_) => {
                 self.mode = Mode::Normal;
                 Effect::None
             }
@@ -310,6 +321,7 @@ impl App {
             KeyCode::Home => self.cursor = 0,
             KeyCode::End => self.cursor = last,
             KeyCode::Char(' ') => self.toggle_current(),
+            KeyCode::Enter => return self.start_details(),
             KeyCode::Char('a') => self.toggle_all_visible(),
             KeyCode::Char('/') => self.mode = Mode::Filter,
             KeyCode::Char('g') => {
@@ -412,6 +424,42 @@ impl App {
         if self.selected.remove(&row.pid).is_none() {
             self.selected.insert(row.pid, process.start_time);
         }
+    }
+
+    fn start_details(&mut self) -> Effect {
+        if self.view == View::Apps {
+            self.status =
+                Some("Switch back to the process view (g) to see process details.".into());
+            return Effect::None;
+        }
+        let rows = self.rows();
+        let Some(row) = rows.get(self.cursor) else {
+            return Effect::None;
+        };
+        match self.inventory.processes.iter().find(|p| p.pid == row.pid) {
+            Some(process) => Effect::ShowDetails {
+                pid: process.pid,
+                start_time: process.start_time,
+            },
+            None => Effect::None,
+        }
+    }
+
+    /// Opens the details popup. `details` is `None` when the process could not be read any more.
+    pub fn show_details(&mut self, pid: u32, details: Option<ProcessDetails>) {
+        let Some(entry) = self.inventory.processes.iter().find(|p| p.pid == pid) else {
+            self.status = Some("The process is no longer running.".to_string());
+            return;
+        };
+        let protected = self.protection.is_protected(entry.pid, &entry.name);
+        let text = render_details(
+            entry,
+            protected,
+            details.as_ref(),
+            &self.inventory.gpus,
+            self.now_unix,
+        );
+        self.mode = Mode::Details(text);
     }
 
     fn toggle_all_visible(&mut self) {
@@ -781,6 +829,50 @@ beta = ["llama"]
         press(&mut app, KeyCode::Char('k'));
         assert!(matches!(app.mode, Mode::Confirm(_)));
         assert_eq!(press(&mut app, KeyCode::Char('y')), Effect::None);
+    }
+
+    #[test]
+    fn enter_asks_for_the_details_of_the_row_under_the_cursor() {
+        let mut app = one_gpu_app();
+        press(&mut app, KeyCode::Down);
+        assert_eq!(
+            press(&mut app, KeyCode::Enter),
+            Effect::ShowDetails {
+                pid: 11,
+                start_time: 1011
+            }
+        );
+    }
+
+    #[test]
+    fn enter_does_nothing_on_an_empty_list_and_hints_in_the_app_view() {
+        let mut empty = app_with(&[gpu(0, 1)], &[], None);
+        assert_eq!(press(&mut empty, KeyCode::Enter), Effect::None);
+        let mut app = one_gpu_app();
+        press(&mut app, KeyCode::Char('g'));
+        assert_eq!(press(&mut app, KeyCode::Enter), Effect::None);
+        assert!(app.status.as_deref().unwrap().contains("process details"));
+    }
+
+    #[test]
+    fn show_details_opens_a_popup_that_any_key_closes() {
+        let mut app = one_gpu_app();
+        app.show_details(10, None);
+        let Mode::Details(text) = &app.mode else {
+            panic!("expected the details popup, got {:?}", app.mode);
+        };
+        assert!(text.contains("llama-server.exe"));
+        assert!(text.contains("gone or was replaced"));
+        press(&mut app, KeyCode::Char('x'));
+        assert_eq!(app.mode, Mode::Normal);
+    }
+
+    #[test]
+    fn show_details_for_a_vanished_pid_only_sets_a_status() {
+        let mut app = one_gpu_app();
+        app.show_details(31337, None);
+        assert_eq!(app.mode, Mode::Normal);
+        assert!(app.status.as_deref().unwrap().contains("no longer running"));
     }
 
     #[test]

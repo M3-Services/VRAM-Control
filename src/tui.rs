@@ -7,6 +7,7 @@ use crate::config::Config;
 use crate::executor::execute_plan;
 use crate::inventory::Inventory;
 use crate::plan::Plan;
+use crate::procs::read_process_details;
 use crate::protect::Protection;
 use crate::ui::draw;
 use crate::winproc::WindowsControl;
@@ -120,6 +121,9 @@ fn event_loop(
                     app.status = Some("Terminating...".to_string());
                     terminal.draw(|frame| draw(frame, app))?;
                     execute(app, &plan, grace_ms);
+                }
+                Effect::ShowDetails { pid, start_time } => {
+                    app.show_details(pid, read_process_details(pid, start_time));
                 }
                 Effect::None => {}
             }

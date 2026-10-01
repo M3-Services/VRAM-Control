@@ -55,3 +55,19 @@ pub struct ProcessMeta {
     pub parent_pid: Option<u32>,
     pub start_time: u64,
 }
+
+/// Extra details about one running process, read on demand for the details popup.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProcessDetails {
+    /// Full path of the executable, when readable.
+    pub exe: Option<String>,
+    pub cmdline: String,
+    /// Working directory, when readable.
+    pub cwd: Option<String>,
+    /// Parent PID and its name, when the parent is still running.
+    pub parent: Option<(u32, String)>,
+    /// Account the process runs under, when readable.
+    pub user: Option<String>,
+    /// Working-set memory (RAM), in bytes.
+    pub ram_bytes: u64,
+}
