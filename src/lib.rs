@@ -1,5 +1,6 @@
 //! VRAM-Control: inventory of GPU memory consumers.
 pub mod collect;
+pub mod config;
 pub mod gpu;
 pub mod inventory;
 pub mod model;

@@ -1,0 +1,49 @@
+# Example configuration for vramctl.
+#
+# Copy this file to %APPDATA%\vramctl\vramctl.toml and adapt it.
+# This file only configures vramctl itself: vramctl never modifies the configuration of any
+# other tool.
+
+# Processes that must never be terminated, in addition to the built-in protection list
+# (dwm.exe, explorer.exe, csrss.exe, ...). The built-in list cannot be reduced from here.
+[protect]
+windows = ["obsidian.exe"]
+wsl = []
+
+# Optional tuning. The values below are the defaults.
+[settings]
+refresh_ms = 1000    # TUI refresh interval
+grace_ms = 3000      # delay between the graceful stop request and forced termination
+wsl_alert_mb = 500   # flag WSL when it uses more VRAM than this
+min_vram_mb = 100    # ignore processes using less dedicated VRAM than this in cleanup plans
+
+# A rule selects processes. All criteria of "match" must match (name, name_regex and
+# cmdline_contains are case-insensitive). The first matching rule wins for a given process.
+#   action = "terminate"  graceful stop request, then forced termination after grace_ms
+#   action = "kill"       forced termination right away
+#   tree = true           also stop the process's descendants
+#   gpu = 0               only processes using GPU 0 (an index), or gpu = "4090" (a name fragment)
+[[rule]]
+name = "llama-server"
+platform = "windows"
+match = { name = "llama-server.exe" }
+action = "terminate"
+
+[[rule]]
+name = "ComfyUI"
+platform = "windows"
+match = { name = "python.exe", cmdline_contains = "comfyui" }
+action = "terminate"
+tree = true
+
+# WSL rules are accepted but not supported yet (they are ignored with a warning).
+# [[rule]]
+# name = "python in WSL"
+# platform = "wsl"
+# distro = "Ubuntu"
+# match = { name = "python3" }
+# action = "terminate"
+
+# A profile is a named list of rules: vramctl clean --profile free-max
+[profiles]
+free-max = ["llama-server", "ComfyUI"]
