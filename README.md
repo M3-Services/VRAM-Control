@@ -3,8 +3,10 @@
 A command-line tool with a terminal UI (TUI) to **find out what is using your GPU memory** and
 **free it** by terminating the processes you choose.
 
-> **Status: design phase.** No release yet. This README describes the planned behavior;
-> see [ROADMAP.md](ROADMAP.md) for ideas beyond the first version.
+> **Status: early development.** `vramctl list` and `vramctl gpus` work (read-only inventory).
+> Cleanup, the TUI, WSL support and administrator elevation are not implemented yet; the rest of
+> this README describes the planned behavior. See [ROADMAP.md](ROADMAP.md) for ideas beyond the
+> first version.
 
 ## Why
 
