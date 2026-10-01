@@ -1,0 +1,15 @@
+# Rust build output
+/target
+
+# Local-only working documents (specs, plans). Never pushed.
+/docs/superpowers/
+
+# Local assistant files and settings
+/CLAUDE.md
+/.claude/
+
+# Obsidian vault settings (docs/ is Obsidian-compatible, but the vault config is personal)
+/docs/.obsidian/
+
+# Local tool config used while testing
+*.local.toml

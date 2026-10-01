@@ -1,0 +1,15 @@
+# Normalize line endings: LF in the repository AND in the working tree,
+# regardless of each contributor's core.autocrlf setting.
+* text=auto eol=lf
+
+# Windows-only script types that require CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.exe binary
